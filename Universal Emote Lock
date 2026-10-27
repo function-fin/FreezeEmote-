@@ -23,19 +23,27 @@ local isSpeedMenuVisible = false
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "EmoteController_CustomUI"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
 
--- [[ CONTAINER PRINCIPAL (Para o UIScale) ]] --
+-- [[ CONTAINER PRINCIPAL (Para o UIScale dinâmico) ]] --
 local MainContainer = Instance.new("Frame")
 MainContainer.Name = "MainContainer"
 MainContainer.Size = UDim2.new(1, 0, 1, 0)
 MainContainer.BackgroundTransparency = 1
 MainContainer.Parent = ScreenGui
 
--- Aplica o aumento de 20% em tudo que estiver dentro do MainContainer
-local UIScale = Instance.new("UIScale")
-UIScale.Scale = 1.2 
-UIScale.Parent = MainContainer
+-- // CONFIGURAÇÃO DE UISCALE DINÂMICO (1.9 no PC / 1.0 no Mobile)
+local UiScale = Instance.new("UIScale", MainContainer)
+local function UpdateUIScale()
+    if not UserInputService.TouchEnabled then
+        UiScale.Scale = 1.9 -- 90% maior no PC
+    else
+        UiScale.Scale = 1.0 -- Tamanho padrão no mobile
+    end
+end
+UpdateUIScale()
+UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(UpdateUIScale)
 
 -- [[ LINHA DE CONEXÃO ]] --
 local ConnectionLine = Instance.new("Frame")
@@ -66,7 +74,7 @@ local function EnableGroupDrag(mainFrame, secondaryFrame, lineFrame)
     UserInputService.InputChanged:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
             local delta = input.Position - dragStart
-            
+
             mainFrame.Position = UDim2.new(
                 startPosMain.X.Scale, startPosMain.X.Offset + delta.X,
                 startPosMain.Y.Scale, startPosMain.Y.Offset + delta.Y
@@ -101,7 +109,7 @@ local function ApplyBorderStyle(element)
     bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     bg.ZIndex = 1
     bg.Parent = element
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = bg
@@ -120,7 +128,7 @@ SpeedMenu.Position = UDim2.new(0.65, -270, 0.45, 0)
 SpeedMenu.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 SpeedMenu.Visible = false
 SpeedMenu.ClipsDescendants = true
-SpeedMenu.Parent = MainContainer -- Parente agora é o Container
+SpeedMenu.Parent = MainContainer
 
 Instance.new("UIStroke", SpeedMenu).Color = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", SpeedMenu).CornerRadius = UDim.new(0, 10)
@@ -182,7 +190,7 @@ MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 64, 0, 130)
 MainFrame.Position = UDim2.new(0.65, 0, 0.45, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-MainFrame.Parent = MainContainer -- Parente agora é o Container
+MainFrame.Parent = MainContainer
 
 Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
@@ -214,7 +222,6 @@ ExternalToggleBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
 ExternalToggleBtn.BackgroundTransparency = 1
 ExternalToggleBtn.Image = ID_TOGGLE_EXTERNO
 ExternalToggleBtn.ScaleType = Enum.ScaleType.Fit
--- O botão externo fica no ScreenGui (fora do UIScale) para manter o tamanho original e livre
 ExternalToggleBtn.Parent = ScreenGui 
 
 -- Arrastar botão externo
@@ -308,7 +315,6 @@ end
 -- [[ CONEXÕES DOS BOTÕES ]] --
 FreezeBtn.MouseButton1Click:Connect(toggleFreeze)
 
--- Lógica de abrir/fechar mini interface e mostrar/esconder a linha
 SpeedToggleBtn.MouseButton1Click:Connect(function()
     isSpeedMenuVisible = not isSpeedMenuVisible
     SpeedMenu.Visible = isSpeedMenuVisible
@@ -354,7 +360,7 @@ ExternalToggleBtn.MouseButton1Click:Connect(function()
 
     isInterfaceVisible = not isInterfaceVisible
     MainFrame.Visible = isInterfaceVisible
-    ConnectionLine.Visible = isInterfaceVisible and isSpeedMenuVisible -- Atualiza a linha se esconder o painel
+    ConnectionLine.Visible = isInterfaceVisible and isSpeedMenuVisible
 
     if not isInterfaceVisible then
         SpeedMenu.Visible = false
