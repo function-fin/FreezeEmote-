@@ -25,20 +25,31 @@ ScreenGui.Name = "EmoteController_CustomUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
 
--- [[ LINHA DE CONEXÃO ENTRE OS PAINÉIS ]] --
+-- [[ CONTAINER PRINCIPAL (Para o UIScale) ]] --
+local MainContainer = Instance.new("Frame")
+MainContainer.Name = "MainContainer"
+MainContainer.Size = UDim2.new(1, 0, 1, 0)
+MainContainer.BackgroundTransparency = 1
+MainContainer.Parent = ScreenGui
+
+-- Aplica o aumento de 20% em tudo que estiver dentro do MainContainer
+local UIScale = Instance.new("UIScale")
+UIScale.Scale = 1.2 
+UIScale.Parent = MainContainer
+
+-- [[ LINHA DE CONEXÃO ]] --
 local ConnectionLine = Instance.new("Frame")
 ConnectionLine.Name = "ConnectionLine"
--- Posição: entre o MainFrame (X: 0.65) e o SpeedMenu (X: 0.65 - 270 pixels)
--- O tamanho compensa o espaço entre eles
 ConnectionLine.Size = UDim2.new(0, 10, 0, 2) 
-ConnectionLine.Position = UDim2.new(0.65, -10, 0.45, 65) -- 65 é a metade da altura do MainFrame
+-- Posição calculada para conectar os dois painéis perfeitamente
+ConnectionLine.Position = UDim2.new(0.65, -10, 0.45, 65) 
 ConnectionLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 ConnectionLine.BorderSizePixel = 0
-ConnectionLine.ZIndex = 1 -- Fica atrás das interfaces
-ConnectionLine.Parent = ScreenGui
+ConnectionLine.ZIndex = 1 
+ConnectionLine.Visible = false -- Começa invisível
+ConnectionLine.Parent = MainContainer
 
 -- [[ FUNÇÃO DE ARRASTE EM CONJUNTO ]] --
--- Agora arrasta o MainFrame, o SpeedMenu e a ConnectionLine juntos
 local function EnableGroupDrag(mainFrame, secondaryFrame, lineFrame)
     local dragging, dragStart, startPosMain, startPosSec, startPosLine
 
@@ -78,7 +89,7 @@ local function EnableGroupDrag(mainFrame, secondaryFrame, lineFrame)
     end)
 end
 
--- [[ FUNÇÃO AUXILIAR PARA CRIAR A BORDA NO FUNDO (RESOLVE O PROBLEMA) ]] --
+-- [[ FUNÇÃO AUXILIAR PARA CRIAR A BORDA NO FUNDO ]] --
 local function ApplyBorderStyle(element)
     element.BackgroundTransparency = 1
     element.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -109,7 +120,7 @@ SpeedMenu.Position = UDim2.new(0.65, -270, 0.45, 0)
 SpeedMenu.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 SpeedMenu.Visible = false
 SpeedMenu.ClipsDescendants = true
-SpeedMenu.Parent = ScreenGui
+SpeedMenu.Parent = MainContainer -- Parente agora é o Container
 
 Instance.new("UIStroke", SpeedMenu).Color = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", SpeedMenu).CornerRadius = UDim.new(0, 10)
@@ -171,12 +182,11 @@ MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 64, 0, 130)
 MainFrame.Position = UDim2.new(0.65, 0, 0.45, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-MainFrame.Parent = ScreenGui
+MainFrame.Parent = MainContainer -- Parente agora é o Container
 
 Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- Chama a função de arrastar incluindo a linha
 EnableGroupDrag(MainFrame, SpeedMenu, ConnectionLine)
 
 -- Botão Paralisar
@@ -204,7 +214,8 @@ ExternalToggleBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
 ExternalToggleBtn.BackgroundTransparency = 1
 ExternalToggleBtn.Image = ID_TOGGLE_EXTERNO
 ExternalToggleBtn.ScaleType = Enum.ScaleType.Fit
-ExternalToggleBtn.Parent = ScreenGui
+-- O botão externo fica no ScreenGui (fora do UIScale) para manter o tamanho original e livre
+ExternalToggleBtn.Parent = ScreenGui 
 
 -- Arrastar botão externo
 do
@@ -297,10 +308,10 @@ end
 -- [[ CONEXÕES DOS BOTÕES ]] --
 FreezeBtn.MouseButton1Click:Connect(toggleFreeze)
 
+-- Lógica de abrir/fechar mini interface e mostrar/esconder a linha
 SpeedToggleBtn.MouseButton1Click:Connect(function()
     isSpeedMenuVisible = not isSpeedMenuVisible
     SpeedMenu.Visible = isSpeedMenuVisible
-    -- A linha só aparece se o menu estiver visível
     ConnectionLine.Visible = isSpeedMenuVisible and isInterfaceVisible
 end)
 
@@ -343,11 +354,10 @@ ExternalToggleBtn.MouseButton1Click:Connect(function()
 
     isInterfaceVisible = not isInterfaceVisible
     MainFrame.Visible = isInterfaceVisible
-    
-    -- Lógica para esconder a linha se a interface principal sumir
+    ConnectionLine.Visible = isInterfaceVisible and isSpeedMenuVisible -- Atualiza a linha se esconder o painel
+
     if not isInterfaceVisible then
         SpeedMenu.Visible = false
         isSpeedMenuVisible = false
-        ConnectionLine.Visible = false
     end
 end)
