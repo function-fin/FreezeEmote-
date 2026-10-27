@@ -1,118 +1,282 @@
-local ScreenGui = Instance.new("ScreenGui")
-local FreezeButton = Instance.new("ImageButton")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
 
--- Seus IDs
-local ID_MOVENDO = "rbxassetid://110202800914637"
-local ID_PARALISADO = "rbxassetid://108879366953239"
+-- [[ ASSETS & IDS FORNECIDOS ]] --
+local ID_TOGGLE_EXTERNO = "rbxassetid://99181741901478"
+local ID_PARALISAR = "rbxassetid://116224255396853"
+local ID_DESATIVAR_PARALISACAO = "rbxassetid://110813246443952"
+local ID_VELOCIDADE = "rbxassetid://82130733566511"
+local ID_ICONE_SPEED_MINI = "rbxassetid://96836127504712"
 
-ScreenGui.Name = "FreezeEmote_Final_V7"
-ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
-
--- Botão apenas imagem
-FreezeButton.Name = "FreezeButton"
-FreezeButton.Parent = ScreenGui
-FreezeButton.BackgroundTransparency = 1
-FreezeButton.BorderSizePixel = 0
-FreezeButton.Position = UDim2.new(0.85, 0, 0.70, 0)
-FreezeButton.Size = UDim2.new(0, 65, 0, 65)
-FreezeButton.Image = ID_MOVENDO
-FreezeButton.ScaleType = Enum.ScaleType.Fit
-
--- [[ SISTEMA DE ARRASTAR COM TRAVA ]] --
+-- [[ ESTADOS DO SISTEMA ]] --
 local isPaused = false
-local dragging, dragInput, dragStart, startPos
+local currentSpeed = 1
 local animConnection = nil
+local lastClickExternal = 0
+local isInterfaceVisible = true
+local isSpeedMenuVisible = false
 
-local function update(input)
-    if isPaused then return end
-    local delta = input.Position - dragStart
-    FreezeButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
+-- [[ GUI PRINCIPAL ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EmoteController_CustomUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
 
-FreezeButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if not isPaused then
+-- [[ LINHA DE CONEXÃO ENTRE OS PAINÉIS ]] --
+local ConnectionLine = Instance.new("Frame")
+ConnectionLine.Name = "ConnectionLine"
+-- Posição: entre o MainFrame (X: 0.65) e o SpeedMenu (X: 0.65 - 270 pixels)
+-- O tamanho compensa o espaço entre eles
+ConnectionLine.Size = UDim2.new(0, 10, 0, 2) 
+ConnectionLine.Position = UDim2.new(0.65, -10, 0.45, 65) -- 65 é a metade da altura do MainFrame
+ConnectionLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ConnectionLine.BorderSizePixel = 0
+ConnectionLine.ZIndex = 1 -- Fica atrás das interfaces
+ConnectionLine.Parent = ScreenGui
+
+-- [[ FUNÇÃO DE ARRASTE EM CONJUNTO ]] --
+-- Agora arrasta o MainFrame, o SpeedMenu e a ConnectionLine juntos
+local function EnableGroupDrag(mainFrame, secondaryFrame, lineFrame)
+    local dragging, dragStart, startPosMain, startPosSec, startPosLine
+
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPos = FreezeButton.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            startPosMain = mainFrame.Position
+            startPosSec = secondaryFrame.Position
+            startPosLine = lineFrame.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+            local delta = input.Position - dragStart
+            
+            mainFrame.Position = UDim2.new(
+                startPosMain.X.Scale, startPosMain.X.Offset + delta.X,
+                startPosMain.Y.Scale, startPosMain.Y.Offset + delta.Y
+            )
+            secondaryFrame.Position = UDim2.new(
+                startPosSec.X.Scale, startPosSec.X.Offset + delta.X,
+                startPosSec.Y.Scale, startPosSec.Y.Offset + delta.Y
+            )
+            lineFrame.Position = UDim2.new(
+                startPosLine.X.Scale, startPosLine.X.Offset + delta.X,
+                startPosLine.Y.Scale, startPosLine.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+-- [[ FUNÇÃO AUXILIAR PARA CRIAR A BORDA NO FUNDO (RESOLVE O PROBLEMA) ]] --
+local function ApplyBorderStyle(element)
+    element.BackgroundTransparency = 1
+    element.TextColor3 = Color3.fromRGB(255, 255, 255)
+    element.ZIndex = 2
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.Position = UDim2.new(0, 0, 0, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    bg.ZIndex = 1
+    bg.Parent = element
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = bg
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = bg
+end
+
+-- [[ MINI INTERFACE DE VELOCIDADE ]] --
+local SpeedMenu = Instance.new("Frame")
+SpeedMenu.Name = "SpeedMenu"
+SpeedMenu.Size = UDim2.new(0, 260, 0, 80)
+SpeedMenu.Position = UDim2.new(0.65, -270, 0.45, 0)
+SpeedMenu.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+SpeedMenu.Visible = false
+SpeedMenu.ClipsDescendants = true
+SpeedMenu.Parent = ScreenGui
+
+Instance.new("UIStroke", SpeedMenu).Color = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", SpeedMenu).CornerRadius = UDim.new(0, 10)
+
+-- Ícone de Velocidade Mini
+local SpeedIconMini = Instance.new("ImageLabel")
+SpeedIconMini.Size = UDim2.new(0, 26, 0, 26)
+SpeedIconMini.Position = UDim2.new(0.04, 0, 0.15, 0)
+SpeedIconMini.BackgroundTransparency = 1
+SpeedIconMini.Image = ID_ICONE_SPEED_MINI
+SpeedIconMini.ScaleType = Enum.ScaleType.Fit
+SpeedIconMini.Parent = SpeedMenu
+
+-- Título Mini
+local SpeedLabelMini = Instance.new("TextLabel")
+SpeedLabelMini.Size = UDim2.new(0, 190, 0, 32)
+SpeedLabelMini.Position = UDim2.new(0.18, 0, 0.12, 0)
+SpeedLabelMini.BackgroundTransparency = 1
+SpeedLabelMini.Text = "VELOCIDADE DO EMOTE\nDEFINA MANUALMENTE A VELOCIDADE"
+SpeedLabelMini.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedLabelMini.Font = Enum.Font.Arcade
+SpeedLabelMini.TextSize = 12
+SpeedLabelMini.TextXAlignment = Enum.TextXAlignment.Left
+SpeedLabelMini.Parent = SpeedMenu
+
+-- Botão Reset
+local ResetBtn = Instance.new("TextButton")
+ResetBtn.Size = UDim2.new(0, 52, 0, 28)
+ResetBtn.Position = UDim2.new(0.04, 0, 0.55, 0)
+ResetBtn.Text = "RESET"
+ResetBtn.Font = Enum.Font.Arcade
+ResetBtn.TextSize = 14
+ResetBtn.Parent = SpeedMenu
+ApplyBorderStyle(ResetBtn)
+
+-- Caixa de Texto / Input
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(0, 70, 0, 28)
+SpeedInput.Position = UDim2.new(0.25, 0, 0.55, 0)
+SpeedInput.Text = "1"
+SpeedInput.Font = Enum.Font.Arcade
+SpeedInput.TextSize = 16
+SpeedInput.Parent = SpeedMenu
+ApplyBorderStyle(SpeedInput)
+
+-- Botão Aplicar
+local ApplyBtn = Instance.new("TextButton")
+ApplyBtn.Size = UDim2.new(0, 84, 0, 28)
+ApplyBtn.Position = UDim2.new(0.54, 0, 0.55, 0)
+ApplyBtn.Text = "APLICAR"
+ApplyBtn.Font = Enum.Font.Arcade
+ApplyBtn.TextSize = 14
+ApplyBtn.Parent = SpeedMenu
+ApplyBorderStyle(ApplyBtn)
+
+-- [[ PAINEL PRINCIPAL VERTICAL ]] --
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 64, 0, 130)
+MainFrame.Position = UDim2.new(0.65, 0, 0.45, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.Parent = ScreenGui
+
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Chama a função de arrastar incluindo a linha
+EnableGroupDrag(MainFrame, SpeedMenu, ConnectionLine)
+
+-- Botão Paralisar
+local FreezeBtn = Instance.new("ImageButton")
+FreezeBtn.Size = UDim2.new(0, 48, 0, 52)
+FreezeBtn.Position = UDim2.new(0.12, 0, 0.08, 0)
+FreezeBtn.BackgroundTransparency = 1
+FreezeBtn.Image = ID_PARALISAR
+FreezeBtn.ScaleType = Enum.ScaleType.Fit
+FreezeBtn.Parent = MainFrame
+
+-- Botão Velocidade
+local SpeedToggleBtn = Instance.new("ImageButton")
+SpeedToggleBtn.Size = UDim2.new(0, 48, 0, 52)
+SpeedToggleBtn.Position = UDim2.new(0.12, 0, 0.52, 0)
+SpeedToggleBtn.BackgroundTransparency = 1
+SpeedToggleBtn.Image = ID_VELOCIDADE
+SpeedToggleBtn.ScaleType = Enum.ScaleType.Fit
+SpeedToggleBtn.Parent = MainFrame
+
+-- [[ BOTÃO EXTERNO SOLTO ]] --
+local ExternalToggleBtn = Instance.new("ImageButton")
+ExternalToggleBtn.Size = UDim2.new(0, 48, 0, 48)
+ExternalToggleBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+ExternalToggleBtn.BackgroundTransparency = 1
+ExternalToggleBtn.Image = ID_TOGGLE_EXTERNO
+ExternalToggleBtn.ScaleType = Enum.ScaleType.Fit
+ExternalToggleBtn.Parent = ScreenGui
+
+-- Arrastar botão externo
+do
+    local dragging, dragStart, startPos
+    ExternalToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = ExternalToggleBtn.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+            local delta = input.Position - dragStart
+            ExternalToggleBtn.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+-- [[ LÓGICA DE CONTROLE DE ANIMAÇÕES ]] --
+local function updateAnimationSpeeds()
+    local char = Player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+        if isPaused then
+            track:AdjustSpeed(0)
+        else
+            track:AdjustSpeed(currentSpeed)
         end
     end
-end)
+end
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
-        update(input)
-    end
-end)
-
--- [[ GERENCIADOR DE ANIMAÇÕES AUTOMÁTICO ]] --
-local function setupAnimationListener(humanoid)
+local function setupAnimationListener(hum)
     if animConnection then
         animConnection:Disconnect()
         animConnection = nil
     end
 
-    if humanoid then
-        animConnection = humanoid.AnimationPlayed:Connect(function(track)
+    if hum then
+        animConnection = hum.AnimationPlayed:Connect(function(track)
             if isPaused then
                 track:AdjustSpeed(0)
+            else
+                track:AdjustSpeed(currentSpeed)
             end
         end)
     end
 end
 
--- Configura a escuta no Humanoid atual
-local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-setupAnimationListener(humanoid)
+setupAnimationListener(Humanoid)
 
--- Atualiza a escuta se o personagem der respawn
-game.Players.LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+Player.CharacterAdded:Connect(function(newChar)
     isPaused = false
-    FreezeButton.Image = ID_MOVENDO
-    local newHumanoid = newCharacter:WaitForChild("Humanoid")
-    setupAnimationListener(newHumanoid)
+    currentSpeed = 1
+    FreezeBtn.Image = ID_PARALISAR
+    Humanoid = newChar:WaitForChild("Humanoid")
+    setupAnimationListener(Humanoid)
 end)
 
--- [[ FUNÇÃO PARA RESTAURAR O PERSONAGEM ]] --
-local function unfreezeCharacter()
-    local char = game.Players.LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local animateScript = char:FindFirstChild("Animate")
-
-    if animateScript then animateScript.Disabled = false end
-    if hum then
-        for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-            track:AdjustSpeed(1)
-        end
-    end
-end
-
--- [[ LÓGICA DE CLIQUE DUPLO E CONGELAMENTO ]] --
-local lastClick = 0
-
-FreezeButton.MouseButton1Click:Connect(function()
-    local currentTime = tick()
-
-    -- Clique duplo para fechar
-    if currentTime - lastClick < 0.3 then
-        if isPaused then
-            unfreezeCharacter()
-        end
-        if animConnection then
-            animConnection:Disconnect()
-        end
-        ScreenGui:Destroy()
-        return
-    end
-    lastClick = currentTime
-
-    local char = game.Players.LocalPlayer.Character
+local function toggleFreeze()
+    local char = Player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     local animateScript = char:FindFirstChild("Animate")
@@ -121,20 +285,69 @@ FreezeButton.MouseButton1Click:Connect(function()
     isPaused = not isPaused
 
     if isPaused then
-        -- MODO: ESTÁTUA
-        FreezeButton.Image = ID_PARALISADO
-        dragging = false
-
+        FreezeBtn.Image = ID_DESATIVAR_PARALISACAO
         if animateScript then animateScript.Disabled = true end
-        for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-            track:AdjustSpeed(0)
-        end
     else
-        -- MODO: NORMAL
-        FreezeButton.Image = ID_MOVENDO
+        FreezeBtn.Image = ID_PARALISAR
         if animateScript then animateScript.Disabled = false end
-        for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-            track:AdjustSpeed(1)
+    end
+    updateAnimationSpeeds()
+end
+
+-- [[ CONEXÕES DOS BOTÕES ]] --
+FreezeBtn.MouseButton1Click:Connect(toggleFreeze)
+
+SpeedToggleBtn.MouseButton1Click:Connect(function()
+    isSpeedMenuVisible = not isSpeedMenuVisible
+    SpeedMenu.Visible = isSpeedMenuVisible
+    -- A linha só aparece se o menu estiver visível
+    ConnectionLine.Visible = isSpeedMenuVisible and isInterfaceVisible
+end)
+
+ApplyBtn.MouseButton1Click:Connect(function()
+    local val = tonumber(SpeedInput.Text)
+    if val then
+        currentSpeed = val
+        if not isPaused then
+            updateAnimationSpeeds()
         end
+    end
+end)
+
+ResetBtn.MouseButton1Click:Connect(function()
+    currentSpeed = 1
+    SpeedInput.Text = "1"
+    if not isPaused then
+        updateAnimationSpeeds()
+    end
+end)
+
+ExternalToggleBtn.MouseButton1Click:Connect(function()
+    local now = tick()
+    if now - lastClickExternal < 0.3 then
+        local char = Player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local animateScript = char:FindFirstChild("Animate")
+            if animateScript then animateScript.Disabled = false end
+            if hum then
+                for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+                    track:AdjustSpeed(1)
+                end
+            end
+        end
+        ScreenGui:Destroy()
+        return
+    end
+    lastClickExternal = now
+
+    isInterfaceVisible = not isInterfaceVisible
+    MainFrame.Visible = isInterfaceVisible
+    
+    -- Lógica para esconder a linha se a interface principal sumir
+    if not isInterfaceVisible then
+        SpeedMenu.Visible = false
+        isSpeedMenuVisible = false
+        ConnectionLine.Visible = false
     end
 end)
