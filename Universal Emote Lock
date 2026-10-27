@@ -49,12 +49,11 @@ UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(UpdateUIScale)
 local ConnectionLine = Instance.new("Frame")
 ConnectionLine.Name = "ConnectionLine"
 ConnectionLine.Size = UDim2.new(0, 10, 0, 2) 
--- Posição calculada para conectar os dois painéis perfeitamente
 ConnectionLine.Position = UDim2.new(0.65, -10, 0.45, 65) 
 ConnectionLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 ConnectionLine.BorderSizePixel = 0
 ConnectionLine.ZIndex = 1 
-ConnectionLine.Visible = false -- Começa invisível
+ConnectionLine.Visible = false
 ConnectionLine.Parent = MainContainer
 
 -- [[ FUNÇÃO DE ARRASTE EM CONJUNTO ]] --
@@ -342,17 +341,27 @@ end)
 ExternalToggleBtn.MouseButton1Click:Connect(function()
     local now = tick()
     if now - lastClickExternal < 0.3 then
+        -- DESLIGAMENTO COMPLETO: Reseta efeitos, reativa o script Animate e destroi a UI
         local char = Player.Character
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
             local animateScript = char:FindFirstChild("Animate")
-            if animateScript then animateScript.Disabled = false end
+            
+            if animateScript then 
+                animateScript.Disabled = false 
+            end
+            
             if hum then
                 for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
                     track:AdjustSpeed(1)
                 end
             end
         end
+        
+        if animConnection then
+            animConnection:Disconnect()
+        end
+        
         ScreenGui:Destroy()
         return
     end
